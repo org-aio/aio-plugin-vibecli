@@ -1,0 +1,28 @@
+schema_version = 2
+
+[plugin.runtime]
+artifact = "dist/server"
+host_version = ">=2026.9.21"
+
+[plugin.runtime.process]
+image = "node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3"
+endpoints = ["https://api.openai.com/v1"]
+http_endpoints = []
+services = []
+worker_capabilities = []
+
+[plugin.frontend]
+path = "dist/frontend"
+
+[plugin.marketplace]
+title = "VibeCLI"
+summary = "在工作台设计 CLI 命令，生成、验证与发布逻辑和文档。"
+license = "MIT"
+tags = ["cli", "ai", "developer-tools"]
+
+[plugin.database]
+migrations = "backend/migrations"
+
+[plugin.capabilities]
+database = true
+cryptography = true

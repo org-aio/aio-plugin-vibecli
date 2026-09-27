@@ -1,0 +1,33 @@
+{
+  "name": "aio-plugin-vibecli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "nuxt build && node scripts/build.mjs",
+    "typecheck": "nuxt typecheck",
+    "test": "tsx --test test/*.test.ts backend/commands/*.test.ts backend/projects/*.test.ts backend/settings/*.test.ts",
+    "test:artifact": "tsx --test test/artifact.e2e.ts",
+    "test:browser": "tsx --test test/browser.e2e.ts",
+    "test:container": "node --test test/container.e2e.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run test:artifact"
+  },
+  "dependencies": {
+    "nuxt": "4.5.2",
+    "vue": "3.5.42",
+    "commander": "^14.0.0",
+    "lucide-vue-next": "^0.468.0",
+    "pg": "^8.16.3",
+    "quickjs-emscripten": "^0.31.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vue-tsc": "3.2.5",
+    "@types/node": "22.15.30",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.0",
+    "@playwright/test": "^1.55.0"
+  }
+}
