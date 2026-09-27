@@ -4,6 +4,7 @@ import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, request as unixRequest } from 'node:http';
+import { createConnection, createServer as createNetServer, type Socket } from 'node:net';
 import { Pool } from 'pg';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -107,64 +108,104 @@ test('独立 v2 artifact: AI 草稿、失败反馈、发布、动态命令与回
   }
 });
 
-test('AIO v2 Unix socket artifact 使用正式 PostgreSQL 并校验宿主身份', { skip: !process.env.VIBECLI_TEST_DATABASE_URL, timeout: 30000 }, async () => {
+test('AIO v2 Unix socket artifact 使用 prefer PostgreSQL socket 并校验宿主身份', { skip: !process.env.VIBECLI_TEST_DATABASE_URL, timeout: 30000 }, async () => {
+  const databaseUrl = process.env.VIBECLI_TEST_DATABASE_URL;
+  assert.ok(databaseUrl);
+  const upstream = new URL(databaseUrl);
   const directory = await mkdtemp(join(tmpdir(), 'vibecli-host-'));
-  const pool = new Pool({ connectionString: process.env.VIBECLI_TEST_DATABASE_URL });
+  const pool = new Pool({ connectionString: databaseUrl });
   const tenant = randomUUID();
   const token = randomBytes(32).toString('hex');
   const socket = join(directory, 'service.sock');
-  for (const name of ['0001_projects.sql', '0002_ai_settings.sql']) {
-    await pool.query(await readFile(new URL(`../backend/migrations/${name}`, import.meta.url), 'utf8'));
-  }
-  const configPath = join(directory, 'config.json');
-  await writeFile(configPath, JSON.stringify({ abi_version: 2, tenant_id: tenant, database_url: process.env.VIBECLI_TEST_DATABASE_URL,
-    ingress_token: token, broker_socket: join(directory, 'broker.sock'), endpoints: ['https://api.openai.com/v1'] }), { mode: 0o600 });
-  const child = spawn(artifactCommand.executable, artifactCommand.args, {
-    cwd: directory, env: { ...process.env, AIO_PLUGIN_CONFIG: configPath, AIO_PLUGIN_SOCKET: socket }, stdio: ['ignore', 'pipe', 'pipe'],
+  const connections = new Set<Socket>();
+  let proxyError: Error | undefined;
+  const proxy = createNetServer(client => {
+    const target = createConnection({ host: upstream.hostname, port: Number(upstream.port || 5432) });
+    connections.add(client);
+    connections.add(target);
+    const fail = (error: Error) => {
+      proxyError ||= error;
+      client.destroy();
+      target.destroy();
+    };
+    client.on('error', fail);
+    target.on('error', fail);
+    client.on('close', () => { connections.delete(client); target.destroy(); });
+    target.on('close', () => { connections.delete(target); client.destroy(); });
+    client.pipe(target).pipe(client);
   });
-  const exit = once(child, 'exit');
-  let log = '';
-  child.stdout.on('data', value => { log += value; });
-  child.stderr.on('data', value => { log += value; });
-  const call = <T>(path: string, method = 'GET', payload?: unknown, actor = 'alice', secret = token): Promise<{ status: number; data: T }> => new Promise((resolve, reject) => {
-    const request = unixRequest({ socketPath: socket, path, method, headers: { 'content-type': 'application/json', 'x-aio-token': secret,
-      'x-aio-tenant-id': tenant, 'x-aio-user-id': actor } }, response => {
-      let body = '';
-      response.on('data', chunk => { body += chunk; });
-      response.on('end', () => { try { resolve({ status: response.statusCode!, data: JSON.parse(body) }); } catch (error) { reject(error); } });
-    });
-    request.on('error', reject);
-    request.end(payload === undefined ? undefined : JSON.stringify(payload));
-  });
+  proxy.on('error', error => { proxyError ||= error; });
+  let initialized = false;
   try {
-    let healthy = false;
-    for (let attempt = 0; attempt < 200; attempt++) {
-      if (child.exitCode !== null) { throw new Error(log); }
-      try { healthy = (await call('/health')).status === 200; } catch { /* 等待新服务的 socket。 */ }
-      if (healthy) { break; }
-      await new Promise(resolve => setTimeout(resolve, 50));
+    const listening = once(proxy, 'listening');
+    proxy.listen(join(directory, '.s.PGSQL.5432'));
+    await listening;
+    for (const name of ['0001_projects.sql', '0002_ai_settings.sql']) {
+      await pool.query(await readFile(new URL(`../backend/migrations/${name}`, import.meta.url), 'utf8'));
     }
-    assert.ok(healthy, log);
-    assert.equal((await call('/aio/describe')).status, 200);
-    assert.equal((await call('/api/projects', 'GET', undefined, 'alice', 'wrong')).status, 401);
-    const created = await call<Project>('/api/projects', 'POST', { title: 'AIO host test' });
-    assert.equal(created.status, 200);
-    const project = created.data;
-    assert.equal((await call(`/api/projects/${project.id}`, 'GET', undefined, 'bob')).status, 404);
-    const published = await call<Project>(`/api/projects/${project.id}/publish`, 'POST', { expected_updated_at: project.updated_at });
-    assert.equal(published.status, 200);
-    const output = await call<ExecutionResult>(`/api/cli/${project.id}/invoke`, 'POST', { argv: ['greet', '--name', 'Ada'] });
-    assert.equal(output.status, 200);
-    assert.equal(output.data.stdout, 'Hello, Ada!\n');
-    const record = await pool.query('SELECT document FROM vibecli_projects WHERE tenant_id=$1 AND user_id=$2 AND id=$3', [tenant, 'alice', project.id]);
-    assert.equal(record.rows[0].document.active_revision, published.data.active_revision);
+    initialized = true;
+    const hostedDatabaseUrl = new URL(databaseUrl);
+    hostedDatabaseUrl.searchParams.set('host', directory);
+    hostedDatabaseUrl.searchParams.set('port', '5432');
+    hostedDatabaseUrl.searchParams.set('sslmode', 'prefer');
+    const configPath = join(directory, 'config.json');
+    await writeFile(configPath, JSON.stringify({ abi_version: 2, tenant_id: tenant, database_url: hostedDatabaseUrl.toString(),
+      ingress_token: token, broker_socket: join(directory, 'broker.sock'), endpoints: ['https://api.openai.com/v1'] }), { mode: 0o600 });
+    const child = spawn(artifactCommand.executable, artifactCommand.args, {
+      cwd: directory, env: { ...process.env, AIO_PLUGIN_CONFIG: configPath, AIO_PLUGIN_SOCKET: socket }, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const exit = once(child, 'exit');
+    let log = '';
+    child.stdout.on('data', value => { log += value; });
+    child.stderr.on('data', value => { log += value; });
+    const call = <T>(path: string, method = 'GET', payload?: unknown, actor = 'alice', secret = token): Promise<{ status: number; data: T }> => new Promise((resolve, reject) => {
+      const request = unixRequest({ socketPath: socket, path, method, headers: { 'content-type': 'application/json', 'x-aio-token': secret,
+        'x-aio-tenant-id': tenant, 'x-aio-user-id': actor } }, response => {
+        let body = '';
+        response.on('data', chunk => { body += chunk; });
+        response.on('end', () => { try { resolve({ status: response.statusCode!, data: JSON.parse(body) }); } catch (error) { reject(error); } });
+      });
+      request.on('error', reject);
+      request.end(payload === undefined ? undefined : JSON.stringify(payload));
+    });
+    try {
+      let healthy = false;
+      for (let attempt = 0; attempt < 200; attempt++) {
+        if (proxyError) { throw proxyError; }
+        if (child.exitCode !== null) { throw new Error(log); }
+        try { healthy = (await call('/health')).status === 200; } catch { /* 等待新服务的 socket。 */ }
+        if (healthy) { break; }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      assert.ok(healthy, log);
+      assert.equal((await call('/aio/describe')).status, 200);
+      assert.equal((await call('/api/projects', 'GET', undefined, 'alice', 'wrong')).status, 401);
+      const created = await call<Project>('/api/projects', 'POST', { title: 'AIO host test' });
+      assert.equal(created.status, 200);
+      const project = created.data;
+      assert.equal((await call(`/api/projects/${project.id}`, 'GET', undefined, 'bob')).status, 404);
+      const published = await call<Project>(`/api/projects/${project.id}/publish`, 'POST', { expected_updated_at: project.updated_at });
+      assert.equal(published.status, 200);
+      const output = await call<ExecutionResult>(`/api/cli/${project.id}/invoke`, 'POST', { argv: ['greet', '--name', 'Ada'] });
+      assert.equal(output.status, 200);
+      assert.equal(output.data.stdout, 'Hello, Ada!\n');
+      const record = await pool.query('SELECT document FROM vibecli_projects WHERE tenant_id=$1 AND user_id=$2 AND id=$3', [tenant, 'alice', project.id]);
+      assert.equal(record.rows[0].document.active_revision, published.data.active_revision);
+      if (proxyError) { throw proxyError; }
+    } finally {
+      child.kill('SIGTERM');
+      const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+      if (child.exitCode === null) { await exit; }
+      clearTimeout(timer);
+    }
   } finally {
-    child.kill('SIGTERM');
-    const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
-    if (child.exitCode === null) { await exit; }
-    clearTimeout(timer);
-    await pool.query('DELETE FROM vibecli_projects WHERE tenant_id=$1', [tenant]);
-    await pool.end();
-    await rm(directory, { recursive: true, force: true });
+    for (const connection of connections) { connection.destroy(); }
+    if (proxy.listening) { await new Promise<void>(resolve => proxy.close(() => resolve())); }
+    try {
+      if (initialized) { await pool.query('DELETE FROM vibecli_projects WHERE tenant_id=$1', [tenant]); }
+    } finally {
+      await pool.end();
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 });
