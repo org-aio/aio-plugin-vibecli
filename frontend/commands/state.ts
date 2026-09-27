@@ -55,6 +55,7 @@ export function useWorkbench() {
   const draft = ref<CommandBundle | null>(null);
   const savedDraft = ref('null');
   const selectedCommand = ref(0);
+  const editorSession = ref(0);
   const loading = ref(true);
   const loadFailure = ref('');
   const error = ref('');
@@ -98,6 +99,7 @@ export function useWorkbench() {
   });
 
   function selectCommand(index: number) {
+    editorSession.value += 1;
     selectedCommand.value = index;
     previewArguments.value = clone(command.value?.examples[0]?.argv || []);
     previewResult.value = null;
@@ -336,7 +338,7 @@ export function useWorkbench() {
 
   onMounted(load);
   return {
-    projects, projectId, project, draft, command, selectedCommand, dirty, loading, loadFailure,
+    projects, projectId, project, draft, command, selectedCommand, editorSession, dirty, loading, loadFailure,
     error, notice, busy, editingDisabled, development, aiConfigured, intent, feedback, generated,
     report, verificationStale, activeRevision, draftDocumentation, previewArguments, previewResult,
     generatedChanged, cliConnection, connectionCommand, selectCommand, selectProject,

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Plus, Trash2 } from 'lucide-vue-next';
+import { defineAsyncComponent } from 'vue';
 import type { CommandDefinition } from '../../shared/commands/model';
 import { usage } from '../../shared/commands/documentation';
 import Arguments from './arguments.vue';
 import { text as t } from './text';
 
 const props = defineProps<{ command: CommandDefinition; disabled: boolean }>();
+const SourceEditor = defineAsyncComponent(() => import('./source-editor.vue'));
 
 function setPath(value: string) {
   props.command.path = value.trim().split(/\s+/).filter(Boolean);
@@ -83,8 +85,8 @@ function changeType(index: number) {
     </section>
 
     <section class="editor-section source-section">
-      <header class="section-header"><h2>{{ t.source }}</h2><span class="muted metadata">{{ t.sourceLanguage }}</span></header>
-      <textarea v-model="command.source" class="source-editor" :aria-label="t.source" :disabled="disabled" spellcheck="false" autocapitalize="off" autocomplete="off" />
+      <header class="section-header"><h2>{{ t.source }}</h2></header>
+      <SourceEditor :command="command" :disabled="disabled" @update:source="command.source = $event" />
     </section>
 
     <section class="editor-section examples-section">

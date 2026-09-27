@@ -18,7 +18,8 @@ export const text = {
   required: '必填', positional: '位置参数', parameterDescription: '参数说明',
   defaultValue: '默认值', hasDefault: '设置默认值', removeParameter: '删除参数',
   stringType: '文本', numberType: '数字', booleanType: '布尔',
-  source: '执行逻辑', sourceLanguage: 'JavaScript / QuickJS', examples: '示例与预期',
+  source: '执行逻辑', sourceLanguage: 'JavaScript', examples: '示例与预期',
+  undo: '撤销', redo: '重做', find: '查找', wrap: '自动换行', syntaxError: '语法错误',
   addExample: '新增示例', removeExample: '删除示例', example: '示例',
   arguments: '参数值', addArgument: '新增参数值', removeArgument: '删除参数值',
   argumentPlaceholder: '参数或值', stdout: '标准输出', stderr: '错误输出',
@@ -63,3 +64,14 @@ export const text = {
   exampleNumber: (index: number) => `示例 ${index + 1}`,
   revisionShort: (id: string) => id.slice(0, 10),
 } as const;
+
+export const editorPhrases = {
+  Find: '查找', Replace: '替换', next: '下一个', previous: '上一个', all: '全部',
+  'match case': '区分大小写', regexp: '正则表达式', 'by word': '全词匹配',
+  replace: '替换', 'replace all': '替换全部', close: '关闭',
+  'Go to line': '跳转到行', go: '跳转', 'Fold line': '折叠行', 'Unfold line': '展开行',
+  'No diagnostics': '无诊断', Diagnostics: '诊断',
+  'Control character': '控制字符', 'current match': '当前匹配', 'on line': '所在行',
+  'replaced match on line $': '已替换第 $ 行匹配', 'replaced $ matches': '已替换 $ 处匹配',
+  'Completions': '补全',
+};

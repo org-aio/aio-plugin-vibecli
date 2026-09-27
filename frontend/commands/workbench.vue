@@ -10,7 +10,7 @@ import { useWorkbench } from './state';
 import { text as t } from './text';
 
 const {
-  projects, projectId, project, draft, command, selectedCommand, dirty, loading, loadFailure,
+  projects, projectId, project, draft, command, selectedCommand, editorSession, dirty, loading, loadFailure,
   error, notice, busy, editingDisabled, development, aiConfigured, intent, feedback, generated,
   report, verificationStale, activeRevision, draftDocumentation, previewArguments, previewResult,
   generatedChanged, cliConnection, connectionCommand, selectCommand, selectProject,
@@ -257,7 +257,7 @@ watch(projectId, () => { tab.value = 'logic'; });
           <header class="project-header"><div class="project-title-block"><span class="eyebrow">{{ t.projects }}</span><input v-model="draft.title" class="project-title" :aria-label="t.projectTitle" :disabled="editingDisabled"></div><div class="project-summary"><span>{{ t.commandCount(draft.commands.length) }}</span><span :class="['badge', { warning: dirty }]">{{ t.draft }}</span><button type="button" class="icon-button small" :title="t.exportBundle" :aria-label="t.exportBundle" :disabled="Boolean(busy)" @click="exportBundle"><Download :size="15" /></button><button type="button" class="icon-button small" :title="t.importBundle" :aria-label="t.importBundle" :disabled="Boolean(busy)" @click="importInput?.click()"><Upload :size="15" /></button><input ref="importInput" type="file" hidden accept=".json,application/json" @change="importBundle"></div></header>
           <div class="workspace-tabbar"><div class="tabs" role="tablist" :aria-label="t.workspace"><button v-for="item in tabs" :id="`tab-${item.id}`" :key="item.id" type="button" role="tab" :aria-selected="tab === item.id" :aria-controls="`panel-${item.id}`" :class="['tab', { selected: tab === item.id }]" @click="tab = item.id"><component :is="item.icon" :size="15" />{{ item.label }}<span v-if="item.id === 'preview' && report" :class="['tab-dot', report.passed ? 'success' : 'error']" /></button></div><button v-if="command && tab === 'logic'" type="button" class="icon-button danger small" :title="t.removeCommand" :aria-label="t.removeCommand" :disabled="editingDisabled" @click="modal = 'delete'"><Trash2 :size="15" /></button></div>
           <div :id="`panel-${tab}`" class="workspace-content" role="tabpanel" :aria-labelledby="`tab-${tab}`">
-            <Editor v-if="tab === 'logic' && command" :command="command" :disabled="editingDisabled" />
+            <Editor v-if="tab === 'logic' && command" :key="editorSession" :command="command" :disabled="editingDisabled" />
             <div v-else-if="tab === 'logic'" class="panel-empty"><Terminal :size="30" /><h2>{{ t.emptyCommand }}</h2><button type="button" class="button" :disabled="editingDisabled" @click="addCommand"><Plus :size="15" />{{ t.addCommand }}</button></div>
             <Panels v-else :tab="tab" :command="command" :documentation="draftDocumentation" v-model:preview-arguments="previewArguments" :preview-result="previewResult" :report="report" :verification-stale="verificationStale" :project="project" :busy="busy" :disabled="Boolean(busy)" :ai-configured="aiConfigured" @preview="runPreview" @verify="verify" @fix="fix" @download="downloadDocumentation" @activate="requestActivate" />
           </div>

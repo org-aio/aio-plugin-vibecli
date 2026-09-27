@@ -2,6 +2,8 @@
 
 - `state.ts` 管理命令集草稿、异步请求和版本状态。命令与文档复用 `shared/commands` 契约。
 - `workbench.vue` 装配导航、工作区和确认窗口；`editor.vue` 编辑定义；`panels.vue` 展示文档、试跑与版本。
+- `source-editor.vue` 接入 CodeMirror 6：JavaScript 高亮、行号、折叠、查找替换、缩进、撤销重做与换行。保存保留编辑历史；切换命令或采用外部草稿通过 `editorSession` 重建编辑器，卸载时销毁编辑器。
+- `source-support.ts` 基于参数定义提供 `input.name` 和 `input["release-date"]` 补全，沿用 JavaScript 局部变量与代码片段；不补全宿主 API。Acorn 按严格模式函数体提示语法错误，最终执行与发布验证仍由后端 QuickJS 完成。
 - 中文文案集中在 `text.ts`，样式集中在 `style.css`。
 - AI 返回值只进入待审核草稿，明确采用后才修改编辑器；保存、验证、发布和试跑期间禁用编辑。
 - 命令集支持 JSON 导入、导出，导入经共享 Zod schema 严格校验，替换未保存修改前需要确认。
