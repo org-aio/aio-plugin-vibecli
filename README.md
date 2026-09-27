@@ -11,7 +11,7 @@ npm run dev -- --port 8791
 
 打开 `http://127.0.0.1:8791`，创建命令集、验证并发布。AI 设置中填写模型入口、模型、协议和可选密钥；未配置模型时仍可手动设计命令。
 
-需要包含 VibeCLI 动态入口的 AIO CLI。连接命令可在工作台的连接窗口复制：
+需要包含 VibeCLI 动态入口的 AIO CLI，可用 `aio vibecli --help` 确认。只更新插件不能为旧 CLI 增加该入口；安装已包含入口的主体版本后，命令版本更新不再要求重装 CLI。连接命令可在工作台的连接窗口复制：
 
 ```sh
 aio vibecli connect http://127.0.0.1:8791/api/cli/<项目UUID>
@@ -44,6 +44,15 @@ aio plugin package . --git https://github.com/org-aio/aio-plugin-vibecli.git --v
 宿主须批准清单锁定的 Node 22 镜像、数据库和加密能力，并应用迁移。模型设置只能选择已授权入口；自定义入口先加入清单授权并发布插件。新增命令逻辑不需要改变插件包。
 
 默认分支通过 `aio-delivery.toml` 接入 AIO 自动交付，使用已有 Fullstack 镜像中的 Node 与 Clang 构建。GitHub 的 Check 工作流独立验证 PostgreSQL、正式 ELF 及容器运行；源码推送后仍需确认宿主交付任务激活，才能视为市场发布成功。
+
+交付验收按以下顺序进行：
+
+1. 默认分支提交通过 GitHub Check，宿主交付任务的 `source_revision` 对应该完整提交 SHA。
+2. 交付任务达到 `active`，组件发布记录的 digest 与任务的 `package_revision` 一致。
+3. 在 AIO 市场安装 VibeCLI，进入安装后的工作台并创建、验证、发布命令集。
+4. 通过工作台连接窗口取得插件来源和项目标识，登录宿主并连接；运行同一命令，修改后再发布并再次执行，确认主体 CLI 无需升级。
+
+插件源码发布更新工作台及执行器；工作台的命令发布只更新数据库里的活动命令版本。首次租户安装、后续插件升级和命令版本发布是三个独立操作。宿主授权配置调整后，可由有发布管理权限的用户重试失败任务。
 
 CLI 使用用户登录会话调用同一插件：
 
@@ -90,3 +99,7 @@ VIBECLI_TEST_UI_URL=http://127.0.0.1:8792 npm run test:browser
 ```
 
 入口：`shared/commands/model.ts` 定义契约，`backend/commands/runtime.ts` 解析执行，`backend/projects/service.ts` 发布回滚，`frontend/commands/workbench.vue` 提供工作台。真实模型、市场上传和已安装宿主需分别验收。
+
+## 许可证
+
+MIT，见 [LICENSE](LICENSE)。
