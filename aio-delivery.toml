@@ -1,4 +1,4 @@
 version = 1
 [build]
-environment = "typescript"
+environment = "fullstack"
 command = ["sh", "scripts/build.sh"]

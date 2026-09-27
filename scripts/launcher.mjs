@@ -4,7 +4,7 @@ import { chmod } from 'node:fs/promises';
 
 export async function buildLauncher() {
   const native = process.platform === 'linux' && process.arch === 'x64';
-  const compiler = native ? 'cc' : 'zig';
+  const compiler = native ? (process.env.CC || 'cc') : 'zig';
   const target = native ? [] : ['cc', '-target', 'x86_64-linux-musl'];
   try {
     await promisify(execFile)(compiler, [

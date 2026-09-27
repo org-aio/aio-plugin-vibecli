@@ -6,4 +6,4 @@
 
 `launcher.c` 和 `launcher.S` 将脚本嵌入正式 ELF，以匿名内存文件交给镜像内 Node 执行；不启动 shell，不修改宿主校验或容器限制。`launcher.mjs` 在 Linux x86_64 使用 C 编译器，其他平台使用 Zig。
 
-`build.sh` 是 AIO 交付入口，使用 npm 锁文件安装、检查和构建。
+`build.sh` 是 AIO 交付入口，使用 Fullstack 镜像中的 Clang 与 npm 锁文件安装、检查和构建。Linux 本机可通过标准 `CC` 选择 C 编译器。

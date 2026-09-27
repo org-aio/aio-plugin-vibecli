@@ -38,10 +38,12 @@ aio --help
 
 ```sh
 aio plugin validate .
-aio plugin package . --git <实际GitHub仓库地址> --version 0.1.0
+aio plugin package . --git https://github.com/org-aio/aio-plugin-vibecli.git --version 0.1.0
 ```
 
 宿主须批准清单锁定的 Node 22 镜像、数据库和加密能力，并应用迁移。模型设置只能选择已授权入口；自定义入口先加入清单授权并发布插件。新增命令逻辑不需要改变插件包。
+
+默认分支通过 `aio-delivery.toml` 接入 AIO 自动交付，使用已有 Fullstack 镜像中的 Node 与 Clang 构建。GitHub 的 Check 工作流独立验证 PostgreSQL、正式 ELF 及容器运行；源码推送后仍需确认宿主交付任务激活，才能视为市场发布成功。
 
 CLI 使用用户登录会话调用同一插件：
 
